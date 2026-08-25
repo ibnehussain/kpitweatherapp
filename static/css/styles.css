@@ -65,6 +65,17 @@ body.theme-snow {
     linear-gradient(145deg, #e8f4f7 0%, #f7fbfc 52%, #dcecf0 100%);
 }
 
+body.theme-hot {
+  --teal: #c0530a;
+  --teal-dark: #943e07;
+  --coral: #f44336;
+  --gold: #ff9800;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(255, 165, 0, 0.55), transparent 32rem),
+    radial-gradient(circle at 20% 80%, rgba(255, 80, 0, 0.22), transparent 22rem),
+    linear-gradient(145deg, #ffe0b2 0%, #fff3e0 48%, #ffd699 100%);
+}
+
 body.theme-storm {
   --ink: #eef6f7;
   --muted: #bed0d6;
@@ -240,6 +251,42 @@ button:disabled { cursor: wait; opacity: 0.65; }
   .current-reading { margin-top: 1.5rem; }
 }
 
+/* ── Weather canvas overlay ── */
+#weather-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page-shell { position: relative; z-index: 1; }
+
+/* ── Heat shimmer (CSS keyframes used by canvas) ── */
+@keyframes heat-wave {
+  0%   { opacity: 0.18; transform: scaleY(1) translateY(0); }
+  50%  { opacity: 0.28; transform: scaleY(1.04) translateY(-4px); }
+  100% { opacity: 0.18; transform: scaleY(1) translateY(0); }
+}
+
+/* Lightning flash for storm theme */
+@keyframes lightning {
+  0%, 89%, 100% { opacity: 0; }
+  90%, 92%      { opacity: 0.55; }
+  91%, 93%      { opacity: 0; }
+}
+
+body.theme-storm::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(180, 220, 255, 0.9);
+  pointer-events: none;
+  z-index: 0;
+  animation: lightning 5s infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation: none !important; }
 }
