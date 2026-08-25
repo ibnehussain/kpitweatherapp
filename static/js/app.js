@@ -73,6 +73,7 @@ function applyWeatherTheme(weatherCode, isDay = 1, temperature = null) {
 /* ── Canvas-based weather particle animations ── */
 let _animFrame = null;
 let _particles = [];
+let _resizeHandler = null;
 
 function startWeatherAnimation(theme) {
   if (_animFrame !== null) {
@@ -80,6 +81,11 @@ function startWeatherAnimation(theme) {
     _animFrame = null;
   }
   _particles = [];
+
+  if (_resizeHandler !== null) {
+    window.removeEventListener('resize', _resizeHandler);
+    _resizeHandler = null;
+  }
 
   let canvas = document.getElementById('weather-canvas');
   if (!canvas) {
@@ -98,7 +104,8 @@ function startWeatherAnimation(theme) {
     canvas.height = window.innerHeight;
   }
   resize();
-  window.addEventListener('resize', resize, { passive: true });
+  _resizeHandler = resize;
+  window.addEventListener('resize', _resizeHandler, { passive: true });
 
   if (theme === 'theme-rain' || theme === 'theme-storm') {
     _particles = Array.from({ length: theme === 'theme-storm' ? 220 : 150 }, () => createRaindrop(canvas));

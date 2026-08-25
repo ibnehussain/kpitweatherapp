@@ -263,13 +263,6 @@ button:disabled { cursor: wait; opacity: 0.65; }
 
 .page-shell { position: relative; z-index: 1; }
 
-/* ── Heat shimmer (CSS keyframes used by canvas) ── */
-@keyframes heat-wave {
-  0%   { opacity: 0.18; transform: scaleY(1) translateY(0); }
-  50%  { opacity: 0.28; transform: scaleY(1.04) translateY(-4px); }
-  100% { opacity: 0.18; transform: scaleY(1) translateY(0); }
-}
-
 /* Lightning flash for storm theme */
 @keyframes lightning {
   0%, 89%, 100% { opacity: 0; }
@@ -288,5 +281,5 @@ body.theme-storm::before {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation: none !important; }
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
