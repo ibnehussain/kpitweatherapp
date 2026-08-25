@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="KPIT mobility weather intelligence dashboard for current conditions and forecasts.">
+  <title>KPIT | Mobility Weather Intelligence</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+  <main class="page-shell">
+    <header class="topbar">
+      <div>
+        <p class="brand-mark" aria-label="KPIT">KPIT<span aria-hidden="true">.</span></p>
+        <p class="eyebrow">Mobility intelligence / Today</p>
+        <h1>Weather dashboard</h1>
+        <p class="tagline">Shaping the future of mobility, one forecast at a time.</p>
+      </div>
+      <p id="updated-time" class="updated">Live conditions for connected journeys</p>
+    </header>
+
+    <form id="weather-form" class="search-panel" novalidate>
+      <div class="field">
+        <label for="city-search">Search for a city</label>
+        <input id="city-search" name="city" type="search" placeholder="e.g. London" autocomplete="address-level2" required>
+      </div>
+      <button id="get-weather" type="submit">Get Weather</button>
+    </form>
+
+    <p id="status" class="status" role="status" aria-live="polite">Enter a city to see its weather.</p>
+
+    <section class="dashboard-grid" aria-label="Weather results">
+      <article class="weather-panel">
+        <p id="location-name" class="location">No location selected</p>
+        <div class="current-reading" aria-live="polite">
+          <span id="weather-symbol" class="weather-symbol" aria-hidden="true">☼</span>
+          <div>
+            <span id="temperature" class="temperature">--</span><span class="temperature-unit">°C</span>
+            <p id="condition" class="condition">Current conditions will appear here</p>
+          </div>
+        </div>
+        <dl class="metrics">
+          <div class="metric"><dt>Feels like</dt><dd id="feels-like">--</dd></div>
+          <div class="metric"><dt>Humidity</dt><dd id="humidity">--</dd></div>
+          <div class="metric"><dt>Wind</dt><dd id="wind">--</dd></div>
+        </dl>
+      </article>
+
+      <article class="weather-panel">
+        <p class="eyebrow">Next hours</p>
+        <h2>Short-range outlook</h2>
+        <p id="hourly-summary" class="empty-state">Hourly conditions will appear after a search.</p>
+      </article>
+
+      <article class="forecast-panel">
+        <p class="eyebrow">Seven day view</p>
+        <h2>Plan the week</h2>
+        <div id="daily-forecast" class="forecast-list" aria-live="polite">
+          <p class="empty-state">Your daily forecast will appear here.</p>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  <script>
+    const form = document.querySelector('#weather-form');
+    const cityInput = document.querySelector('#city-search');
+    const button = document.querySelector('#get-weather');
+    const status = document.querySelector('#status');
+    const fallbackLocation = { name: 'London', latitude: 51.5072, longitude: -0.1276 };
+    let requestNumber = 0;
+
+    const weatherCodes = {
+      0: ['Clear sky', '☀'], 1: ['Mainly clear', '🌤'], 2: ['Partly cloudy', '⛅'], 3: ['Overcast', '☁'],
+      45: ['Foggy', '〰'], 48: ['Rime fog', '〰'], 51: ['Light drizzle', '🌦'], 53: ['Drizzle', '🌦'],
+      55: ['Heavy drizzle', '🌧'], 61: ['Light rain', '🌦'], 63: ['Rain', '🌧'], 65: ['Heavy rain', '🌧'],
+      71: ['Light snow', '🌨'], 73: ['Snow', '❄'], 75: ['Heavy snow', '❄'], 80: ['Rain showers', '🌦'],
+      81: ['Showers', '🌧'], 82: ['Heavy showers', '🌧'], 95: ['Thunderstorm', '⛈'], 96: ['Thunderstorm with hail', '⛈'], 99: ['Heavy thunderstorm', '⛈']
+    };
+
+    function weatherDescription(code) {
+      return weatherCodes[code] || ['Conditions unavailable', '·'];
+    }
+
+    function setStatus(message, isError = false) {
+      status.textContent = message;
+      status.classList.toggle('error', isError);
+    }
+
+    async function getJson(url) {
+      const response = await fetch(url);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error?.message || 'The weather service is unavailable.');
+      return payload;
+    }
+
+    async function loadWeather(location) {
+      const currentRequest = ++requestNumber;
+      button.disabled = true;
+      setStatus(`Loading weather for ${location.name}...`);
+
+      try {
+        const data = await getJson(`/api/forecast?lat=${encodeURIComponent(location.latitude)}&lon=${encodeURIComponent(location.longitude)}`);
+        if (currentRequest !== requestNumber) return;
+        renderWeather(data, location);
+        localStorage.setItem('weather-location', JSON.stringify(location));
+        setStatus(`Weather updated for ${location.name}.`);
+      } catch (error) {
+        if (currentRequest === requestNumber) setStatus(error.message, true);
+      } finally {
+        if (currentRequest === requestNumber) button.disabled = false;
+      }
+    }
+
+    function renderWeather(data, location) {
+      const current = data.current || {};
+      const [condition, symbol] = weatherDescription(current.weather_code);
+      document.querySelector('#location-name').textContent = `${location.name} · ${data.location?.timezone || 'local time'}`;
+      document.querySelector('#weather-symbol').textContent = symbol;
+      document.querySelector('#temperature').textContent = Math.round(current.temperature ?? 0);
+      document.querySelector('#condition').textContent = current.condition || condition;
+      document.querySelector('#feels-like').textContent = `${Math.round(current.feels_like ?? 0)}°C`;
+      document.querySelector('#humidity').textContent = `${current.humidity ?? '--'}%`;
+      document.querySelector('#wind').textContent = `${Math.round(current.wind_speed ?? 0)} km/h`;
+      document.querySelector('#updated-time').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+      document.querySelector('#hourly-summary').textContent = summarizeHourly(data.hourly);
+      renderDaily(data.daily);
+    }
+
+    function summarizeHourly(hourly) {
+      if (!hourly?.time?.length) return 'Hourly conditions are unavailable.';
+      const next = hourly.temperature?.slice(0, 3).map((temperature, index) => `${hourly.time[index].slice(11, 16)} ${Math.round(temperature)}°C`).join(' · ');
+      return next || 'Hourly conditions are unavailable.';
+    }
+
+    function renderDaily(daily) {
+      const forecast = document.querySelector('#daily-forecast');
+      if (!daily?.time?.length) {
+        forecast.innerHTML = '<p class="empty-state">Daily forecast is unavailable.</p>';
+        return;
+      }
+      forecast.innerHTML = daily.time.slice(0, 7).map((date, index) => {
+        const [label, icon] = weatherDescription(daily.weather_code?.[index]);
+        const day = new Date(`${date}T12:00:00`).toLocaleDateString([], { weekday: 'short' });
+        return `<div class="forecast-item"><span class="forecast-day">${day}</span><span class="forecast-icon" aria-label="${label}">${icon}</span><span class="forecast-temp">${Math.round(daily.temperature_2m_max?.[index] ?? 0)}° <span class="forecast-low">${Math.round(daily.temperature_2m_min?.[index] ?? 0)}°</span></span></div>`;
+      }).join('');
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const query = cityInput.value.trim();
+      if (!query) {
+        setStatus('Enter a city name before searching.', true);
+        cityInput.focus();
+        return;
+      }
+      await window.getWeather(query);
+    });
+
+    try {
+      const saved = JSON.parse(localStorage.getItem('weather-location') || 'null');
+      window.getWeather(saved?.name || fallbackLocation.name);
+    } catch {
+      window.getWeather(fallbackLocation.name);
+    }
+  </script>
+</body>
+</html>
